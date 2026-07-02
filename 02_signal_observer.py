@@ -60,7 +60,7 @@ def _load_state() -> dict:
     try:
         return json.loads(STATE_FILE.read_text(encoding="utf-8"))
     except Exception:
-        return {"seen_ts": [], "open": {}, "last_prices": []}
+        return {"seen_ts": [], "open": {}, "last_prices": [], "last_signal": {}}
 
 
 def _save_state(state: dict) -> None:
@@ -268,7 +268,10 @@ def _build_record(detector: str, rec: dict, current_price: float, state: dict) -
         "mae": None,
         "status": "pending",
     }
-    state.get("seen_ts").append(mapped.get("signal_ts"))
+    seen = state.get("seen_ts")
+    seen.append(mapped.get("signal_ts"))
+    if len(seen) > 500:
+        state["seen_ts"] = seen[-500:]
     state.get("open")[obs_id] = {
         "obs_id": obs_id,
         "price_at_signal": current_price,
@@ -391,9 +394,15 @@ def main():
             signal_ts = int(rec.get("window_start_ts") or 0)
             if signal_ts <= 0:
                 continue
+            direction = rec.get("direction")
+            last = state.get("last_signal", {}).get(detector)
+            COOLDOWN_MS = 60000
+            if last and last.get("direction") == direction and (signal_ts - int(last.get("ts") or 0)) < COOLDOWN_MS:
+                continue
             if signal_ts in state.get("seen_ts"):
                 continue
             obs = _build_record(detector, rec, current_price, state)
+            state.setdefault("last_signal", {})[detector] = {"direction": direction, "ts": signal_ts}
             _append_obs(obs)
         _update_open_observations(state, current_price)
         _save_state(state)
