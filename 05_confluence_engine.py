@@ -45,6 +45,13 @@ EVENT_DIRECTION_MAP = {
 }
 
 
+def _label_matches_direction(signal_label: str, direction: str) -> bool:
+    mapped = EVENT_DIRECTION_MAP.get(signal_label)
+    if mapped is None:
+        return True
+    return (mapped == "LONG" and direction == "long") or (mapped == "SHORT" and direction == "short")
+
+
 def load_telegram_reporter():
     try:
         path = BASE / "07_telegram_reporter.py"
@@ -383,24 +390,26 @@ def open_trade(direction, long_score, short_score, breakdown, active_signals, zo
         return
     primary_signal = None
     signal_label = None
-    if active_signals.get("sweep"):
+    if active_signals.get("sweep") and _label_matches_direction(active_signals["sweep"], direction):
         primary_signal = "sweep"
         signal_label = active_signals["sweep"]
-    elif active_signals.get("absorption"):
+    elif active_signals.get("absorption") and _label_matches_direction(active_signals["absorption"], direction):
         primary_signal = "absorption"
         signal_label = active_signals["absorption"]
-    elif active_signals.get("trapped"):
+    elif active_signals.get("trapped") and _label_matches_direction(active_signals["trapped"], direction):
         primary_signal = "trapped"
         signal_label = active_signals["trapped"]
-    elif active_signals.get("initiative"):
+    elif active_signals.get("initiative") and _label_matches_direction(active_signals["initiative"], direction):
         primary_signal = "initiative"
         signal_label = active_signals["initiative"]
-    elif active_signals.get("exhaustion"):
+    elif active_signals.get("exhaustion") and _label_matches_direction(active_signals["exhaustion"], direction):
         primary_signal = "exhaustion"
         signal_label = active_signals["exhaustion"]
     elif ((str_1m.get("bos") or {}).get("macro_bos")) in {"bullish", "bearish"}:
-        primary_signal = "bos"
-        signal_label = ((str_1m.get("bos") or {}).get("macro_bos"))
+        candidate = (str_1m.get("bos") or {}).get("macro_bos")
+        if _label_matches_direction(candidate, direction):
+            primary_signal = "bos"
+            signal_label = candidate
     if not primary_signal:
         primary_signal = "bos"
         signal_label = "bullish" if direction == "long" else "bearish"

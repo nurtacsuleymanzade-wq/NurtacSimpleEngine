@@ -172,8 +172,8 @@ def _summary_text() -> str:
     wr = float(balance.get("win_rate") or 0)
     pf = float(balance.get("profit_factor") or 0)
     avg_r = float(balance.get("avg_pnl_r") or 0)
-    current_balance = float(balance.get("current_balance") or 0)
     initial_balance = float(balance.get("initial_balance") or 500.0)
+    current_balance = float(balance.get("current_balance") or initial_balance)
     pnl_pct = ((current_balance - initial_balance) / initial_balance * 100.0) if initial_balance > 0 else 0.0
     trend = _trend_1m()
     if not recent:
