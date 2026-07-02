@@ -99,9 +99,11 @@ def _trend_1m() -> str:
     return trend.get("direction") or "unknown"
 
 
-def _pnl_summary(trades: list[dict]) -> tuple[int, int, float, float]:
+def _pnl_summary(trades: list[dict]) -> tuple[int, int, int, int, float, float]:
     opened = 0
     closed = 0
+    tp_count = 0
+    sl_count = 0
     tp_r = 0.0
     sl_r = 0.0
     for trade in trades:
@@ -111,10 +113,12 @@ def _pnl_summary(trades: list[dict]) -> tuple[int, int, float, float]:
             closed += 1
             pnl_r = float(trade.get("pnl_r") or 0)
             if trade.get("outcome") == "win":
+                tp_count += 1
                 tp_r += pnl_r
             elif trade.get("outcome") == "loss":
+                sl_count += 1
                 sl_r += pnl_r
-    return opened, closed, tp_r, sl_r
+    return opened, closed, tp_count, sl_count, tp_r, sl_r
 
 
 def notify_trade_open(trade: dict) -> bool:
@@ -163,7 +167,7 @@ def _summary_text() -> str:
     trades = _tail_jsonl(TRADES_FILE, 5000)
     recent = [t for t in trades if int(t.get("open_ts") or 0) >= int(time.time() * 1000) - 900000 or int(t.get("close_ts") or 0) >= int(time.time() * 1000) - 900000]
     balance = _read_json(BALANCE_FILE)
-    opened, closed, tp_r, sl_r = _pnl_summary(recent)
+    opened, closed, tp_count, sl_count, tp_r, sl_r = _pnl_summary(recent)
     total_trades = int(balance.get("closed_trades") or 0)
     wr = float(balance.get("win_rate") or 0)
     pf = float(balance.get("profit_factor") or 0)
@@ -195,8 +199,8 @@ def _summary_text() -> str:
         f"Son 15 Dakika:\n"
         f"🟢 Açılan:   {opened}\n"
         f"🔴 Kapanan:  {closed}\n"
-        f"✅ TP:       {opened if opened else 0}  ({tp_r:+.2f}R)\n"
-        f"❌ SL:       {closed if closed else 0}  ({sl_r:+.2f}R)\n"
+        f"✅ TP:       {tp_count}  ({tp_r:+.2f}R)\n"
+        f"❌ SL:       {sl_count}  ({sl_r:+.2f}R)\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"Engine Performansı:\n"
         f"ICT:     {int((by_engine.get('ict') or {}).get('trades') or 0)} trade | WR:{engine_wr('ict'):.0f}%\n"
