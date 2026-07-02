@@ -272,6 +272,13 @@ def calc_confluence(zone, str_1m, str_15m, absorptions, initiatives, exhaustions
     long_score = long_context + long_signal
     short_score = short_context + short_signal
 
+    # Context (trend/lokasyon) onayı olmadan trade açma
+    MIN_CONTEXT = 2
+    if long_context < MIN_CONTEXT:
+        long_score = 0
+    if short_context < MIN_CONTEXT:
+        short_score = 0
+
     breakdown = {
         "long_context": long_context,
         "long_signal": long_signal,
@@ -316,9 +323,9 @@ def calculate_sl_tp(direction, entry, atr, zone, str_1m):
         else:
             primary_signal = str_1m.get("_primary_signal")
             if primary_signal in {"sweep", "trapped"}:
-                primary = entry - (atr * 1.5)
-            else:
                 primary = entry - (atr * 2.0)
+            else:
+                primary = entry - (atr * 2.5)
     else:
         nearest = [ob for ob in order_blocks if safe_float(ob.get("ob_high"), 0) > entry]
         nearest.sort(key=lambda ob: abs(safe_float(ob.get("ob_high"), 0) - entry))
@@ -328,9 +335,9 @@ def calculate_sl_tp(direction, entry, atr, zone, str_1m):
         else:
             primary_signal = str_1m.get("_primary_signal")
             if primary_signal in {"sweep", "trapped"}:
-                primary = entry + (atr * 1.5)
-            else:
                 primary = entry + (atr * 2.0)
+            else:
+                primary = entry + (atr * 2.5)
 
     sl = primary
     if not sl or sl == entry:
@@ -509,7 +516,8 @@ def check_and_close_trades(zone, telegram):
                 else:
                     continue
             risk_usd = safe_float(trade.get("risk_usd"), current_balance * 0.01)
-            pnl_r = 2.0 if outcome == "win" else -1.0
+            trade_rr = safe_float(trade.get("rr"), 2.0)
+            pnl_r = trade_rr if outcome == "win" else -1.0
             pnl_usd = risk_usd * pnl_r
             close_ts = int(time.time() * 1000)
             duration_s = max(0, (close_ts - safe_int(trade.get("open_ts"), close_ts)) // 1000)
@@ -609,9 +617,11 @@ def main():
             str_1m["_meta"] = meta
             check_and_close_trades(zone, telegram)
 
-            if long_score >= 4 and long_score > short_score:
+            MIN_SCORE = 7
+            MIN_GAP = 3
+            if long_score >= MIN_SCORE and (long_score - short_score) >= MIN_GAP:
                 maybe_open_trade("long", long_score, short_score, breakdown, active_signals, zone, str_1m, telegram)
-            elif short_score >= 4 and short_score > long_score:
+            elif short_score >= MIN_SCORE and (short_score - long_score) >= MIN_GAP:
                 maybe_open_trade("short", long_score, short_score, breakdown, active_signals, zone, str_1m, telegram)
         except Exception as e:
             print(f"[CONFLUENCE] loop error: {e}", flush=True)
